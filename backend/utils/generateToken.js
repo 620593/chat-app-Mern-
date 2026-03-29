@@ -5,11 +5,14 @@ const generateTokenAndSetCookie = (userId, res) => {
 		expiresIn: "15d",
 	});
 
+	const nodeEnv = process.env.NODE_ENV || "production";
+	const isProduction = nodeEnv === "production";
+
 	res.cookie("jwt", token, {
 		maxAge: 15 * 24 * 60 * 60 * 1000, // MS
 		httpOnly: true, // prevent XSS attacks cross-site scripting attacks
-		sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-		secure: process.env.NODE_ENV === "production",
+		sameSite: isProduction ? "none" : "lax",
+		secure: isProduction,
 	});
 };
 
