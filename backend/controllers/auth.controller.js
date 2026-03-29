@@ -71,6 +71,9 @@ export const login = async (req, res) => {
 
 		generateTokenAndSetCookie(user._id, res);
 
+		console.log(`[AUTH] Login successful for user: ${username}`);
+		console.log(`[AUTH] Set-Cookie header being sent: ${res.getHeader("set-cookie") ? "YES" : "NO"}`);
+
 		res.status(200).json({
 			_id: user._id,
 			fullName: user.fullName,
