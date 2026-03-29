@@ -1,69 +1,160 @@
-import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
-import { getReceiverSocketId, io } from "../socket/socket.js";
+import Chat from "../models/chat.model.js";
+import { io } from "../socket/socket.js";
 
-export const sendMessage = async (req, res) => {
-	try {
-		const { message } = req.body;
-		const { id: receiverId } = req.params;
-		const senderId = req.user._id;
+// ─── Get all messages for a chat ─────────────────────────────────────────────
+export const getMessages = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user._id;
 
-		let conversation = await Conversation.findOne({
-			participants: { $all: [senderId, receiverId] },
-		});
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: userId,
+    });
 
-		if (!conversation) {
-			conversation = await Conversation.create({
-				participants: [senderId, receiverId],
-			});
-		}
+    if (!chat) {
+      return res.status(403).json({ error: "Not a participant of this chat" });
+    }
 
-		const newMessage = new Message({
-			senderId,
-			receiverId,
-			message,
-		});
+    const messages = await Message.find({ chatId })
+      .populate("senderId", "fullName username profilePic")
+      .sort({ createdAt: 1 });
 
-		if (newMessage) {
-			conversation.messages.push(newMessage._id);
-		}
-
-		// await conversation.save();
-		// await newMessage.save();
-
-		// this will run in parallel
-		await Promise.all([conversation.save(), newMessage.save()]);
-
-		// SOCKET IO FUNCTIONALITY WILL GO HERE
-		const receiverSocketId = getReceiverSocketId(receiverId);
-		if (receiverSocketId) {
-			// io.to(<socket_id>).emit() used to send events to specific client
-			io.to(receiverSocketId).emit("newMessage", newMessage);
-		}
-
-		res.status(201).json(newMessage);
-	} catch (error) {
-		console.log("Error in sendMessage controller: ", error.message);
-		res.status(500).json({ error: "Internal server error" });
-	}
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error("getMessages error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
-export const getMessages = async (req, res) => {
-	try {
-		const { id: userToChatId } = req.params;
-		const senderId = req.user._id;
+// ─── Send Message (HTTP fallback; primary path is via socket) ─────────────────
+export const sendMessage = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { content } = req.body;
+    const senderId = req.user._id;
 
-		const conversation = await Conversation.findOne({
-			participants: { $all: [senderId, userToChatId] },
-		}).populate("messages"); // NOT REFERENCE BUT ACTUAL MESSAGES
+    const chat = await Chat.findOne({
+      _id: chatId,
+      participants: senderId,
+    });
 
-		if (!conversation) return res.status(200).json([]);
+    if (!chat) {
+      return res.status(403).json({ error: "Not a participant of this chat" });
+    }
 
-		const messages = conversation.messages;
+    const newMessage = await Message.create({
+      senderId,
+      chatId,
+      content,
+      status: "sent",
+      receiverId: !chat.isGroup
+        ? chat.participants.find((p) => p.toString() !== senderId.toString())
+        : undefined,
+    });
 
-		res.status(200).json(messages);
-	} catch (error) {
-		console.log("Error in getMessages controller: ", error.message);
-		res.status(500).json({ error: "Internal server error" });
-	}
+    // Update chat metadata
+    await Chat.findByIdAndUpdate(chatId, {
+      $push: { messages: newMessage._id },
+      latestMessage: newMessage._id,
+    });
+
+    // Increment unread counts for others
+    for (const participantId of chat.participants) {
+      if (participantId.toString() === senderId.toString()) continue;
+
+      const entry = chat.unreadCounts?.find(
+        (u) => u.userId?.toString() === participantId.toString()
+      );
+      if (entry) {
+        await Chat.updateOne(
+          { _id: chatId, "unreadCounts.userId": participantId },
+          { $inc: { "unreadCounts.$.count": 1 } }
+        );
+      } else {
+        await Chat.findByIdAndUpdate(chatId, {
+          $push: { unreadCounts: { userId: participantId, count: 1 } },
+        });
+      }
+    }
+
+    const populated = await Message.findById(newMessage._id).populate(
+      "senderId",
+      "fullName username profilePic"
+    );
+
+    // Emit to socket room
+    io.to(chatId).emit("receive_message", populated);
+
+    res.status(201).json(populated);
+  } catch (error) {
+    console.error("sendMessage error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ─── Add/Toggle Reaction ─────────────────────────────────────────────────────
+export const addReaction = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.userId?.toString() === userId.toString()
+    );
+
+    if (existingIndex !== -1) {
+      // Toggle off if same emoji, else update
+      if (message.reactions[existingIndex].emoji === emoji) {
+        message.reactions.splice(existingIndex, 1);
+      } else {
+        message.reactions[existingIndex].emoji = emoji;
+      }
+    } else {
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+
+    // Notify room
+    io.to(message.chatId.toString()).emit("reaction_updated", {
+      messageId,
+      reactions: message.reactions,
+    });
+
+    res.status(200).json({ reactions: message.reactions });
+  } catch (error) {
+    console.error("addReaction error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ─── Mark messages as seen ───────────────────────────────────────────────────
+export const markAsSeen = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user._id;
+
+    await Message.updateMany(
+      { chatId, receiverId: userId, status: { $ne: "seen" } },
+      { status: "seen" }
+    );
+
+    await Chat.updateOne(
+      { _id: chatId, "unreadCounts.userId": userId },
+      { $set: { "unreadCounts.$.count": 0 } }
+    );
+
+    io.to(chatId).emit("chat_read", { chatId, userId });
+
+    res.status(200).json({ message: "Messages marked as seen" });
+  } catch (error) {
+    console.error("markAsSeen error:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };

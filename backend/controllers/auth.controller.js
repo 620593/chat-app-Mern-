@@ -4,7 +4,7 @@ import generateTokenAndSetCookie from "../utils/generateToken.js";
 
 export const signup = async (req, res) => {
 	try {
-		const { fullName, username, password, confirmPassword, gender } = req.body;
+		const { fullName, username, password, confirmPassword, gender, profilePic } = req.body;
 
 		if (password !== confirmPassword) {
 			return res.status(400).json({ error: "Passwords don't match" });
@@ -20,17 +20,23 @@ export const signup = async (req, res) => {
 		const salt = await bcrypt.genSalt(10);
 		const hashedPassword = await bcrypt.hash(password, salt);
 
-		// https://avatar-placeholder.iran.liara.run/
+		// Prepare Emoji-based Profile Pictures
+		const boyEmojis = ["👨", "🧑", "👨‍🦱", "👨‍🦰", "👱‍♂️", "👨‍🦳", "👨‍🦲", "🧔", "🦸‍♂️", "🥷", "👮‍♂️", "🕵️‍♂️", "💂‍♂️", "👷‍♂️", "🤴", "👳‍♂️", "👲", "🧝‍♂️", "🧙‍♂️", "🧛‍♂️", "🧟‍♂️", "🦹‍♂️", "🧜‍♂️"];
+		const girlEmojis = ["👩", "👧", "👩‍🦱", "👩‍🦰", "👱‍♀️", "👩‍🦳", "👩‍🦲", "🦸‍♀️", "🥷", "👮‍♀️", "🕵️‍♀️", "💂‍♀️", "👷‍♀️", "👸", "👳‍♀️", "🧕", "🧝‍♀️", "🧙‍♀️", "🧛‍♀️", "🧟‍♀️", "🦹‍♀️", "🧜‍♀️"];
 
-		const boyProfilePic = `https://avatar.iran.liara.run/public/boy?username=${username}`;
-		const girlProfilePic = `https://avatar.iran.liara.run/public/girl?username=${username}`;
+		const randomEmoji = gender === "male" 
+			? boyEmojis[Math.floor(Math.random() * boyEmojis.length)] 
+			: girlEmojis[Math.floor(Math.random() * girlEmojis.length)];
+		
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${randomEmoji}</text></svg>`;
+		const profilePicDataUri = profilePic || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 
 		const newUser = new User({
 			fullName,
 			username,
 			password: hashedPassword,
 			gender,
-			profilePic: gender === "male" ? boyProfilePic : girlProfilePic,
+			profilePic: profilePicDataUri,
 		});
 
 		if (newUser) {

@@ -5,17 +5,26 @@ import Login from "./pages/login/Login";
 import SignUp from "./pages/signup/SignUp";
 import { Toaster } from "react-hot-toast";
 import { useAuthContext } from "./context/AuthContext";
+import { useWebRTCContext } from "./context/WebRTCContext";
+import VideoCallModal from "./components/calls/VideoCallModal";
+import AnimatedBackground from "./components/layout/AnimatedBackground";
+import CursorParticles from "./components/layout/CursorParticles";
 
 function App() {
 	const { authUser } = useAuthContext();
+	const webRTC = useWebRTCContext();
+	
 	return (
-		<div className='p-4 h-screen flex items-center justify-center'>
+		<div className='p-4 h-screen flex items-center justify-center relative overflow-hidden'>
+			<AnimatedBackground />
+			<CursorParticles />
 			<Routes>
 				<Route path='/' element={authUser ? <Home /> : <Navigate to={"/login"} />} />
 				<Route path='/login' element={authUser ? <Navigate to='/' /> : <Login />} />
 				<Route path='/signup' element={authUser ? <Navigate to='/' /> : <SignUp />} />
 			</Routes>
 			<Toaster />
+			{authUser && <VideoCallModal webRTC={webRTC} />}
 		</div>
 	);
 }
