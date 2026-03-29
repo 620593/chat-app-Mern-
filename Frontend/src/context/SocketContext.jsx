@@ -39,9 +39,9 @@ export const SocketContextProvider = ({ children }) => {
 		if (socketRef.current?.connected) return;
 
 		const socketUrl =
-			import.meta.env.MODE === "production"
-				? window.location.origin
-				: "http://localhost:5000";
+			import.meta.env.VITE_BACKEND_URL ||
+			import.meta.env.VITE_URL ||
+			"http://localhost:5000";
 
 		setConnectionStatus("connecting");
 

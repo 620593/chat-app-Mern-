@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import useConversation from "../zustand/useConversation";
 import toast from "react-hot-toast";
 import { useSocketContext } from "../context/SocketContext";
+import { getApiUrl } from "../utils/api";
 
 const useGetMessages = () => {
 	const [loading, setLoading] = useState(false);
@@ -16,9 +17,10 @@ const useGetMessages = () => {
 			setLoading(true);
 			try {
 				// 1. Get or create a 1-1 chat first to get the unified chatId
-				const chatRes = await fetch("/api/chats", {
+				const chatRes = await fetch(getApiUrl("/chats"), {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
+					credentials: "include",
 					body: JSON.stringify({ userId: selectedConversation._id }),
 				});
 				const chatData = await chatRes.json();
@@ -32,7 +34,9 @@ const useGetMessages = () => {
 				}
 
 				// 3. Fetch past messages for this chat
-				const res = await fetch(`/api/messages/${chatData._id}`);
+				const res = await fetch(getApiUrl(`/messages/${chatData._id}`), {
+					credentials: "include",
+				});
 				const data = await res.json();
 				if (data.error) throw new Error(data.error);
 				
