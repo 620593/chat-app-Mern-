@@ -11,22 +11,31 @@ import AnimatedBackground from "./components/layout/AnimatedBackground";
 import CursorParticles from "./components/layout/CursorParticles";
 
 function App() {
-	const { authUser } = useAuthContext();
-	const webRTC = useWebRTCContext();
-	
-	return (
-		<div className='p-4 h-screen flex items-center justify-center relative overflow-hidden'>
-			<AnimatedBackground />
-			<CursorParticles />
-			<Routes>
-				<Route path='/' element={authUser ? <Home /> : <Navigate to={"/login"} />} />
-				<Route path='/login' element={authUser ? <Navigate to='/' /> : <Login />} />
-				<Route path='/signup' element={authUser ? <Navigate to='/' /> : <SignUp />} />
-			</Routes>
-			<Toaster />
-			{authUser && <VideoCallModal webRTC={webRTC} />}
-		</div>
-	);
+  const { authUser } = useAuthContext();
+  const webRTC = useWebRTCContext();
+
+  return (
+    <div className="p-4 h-screen flex items-center justify-center relative overflow-hidden">
+      <AnimatedBackground />
+      <CursorParticles />
+      <Routes>
+        <Route
+          path="/"
+          element={authUser ? <Home /> : <Navigate to={"/login"} />}
+        />
+        <Route
+          path="/login"
+          element={authUser ? <Navigate to="/" /> : <Login />}
+        />
+        <Route
+          path="/signup"
+          element={authUser ? <Navigate to="/" /> : <SignUp />}
+        />
+      </Routes>
+      <Toaster />
+      {authUser && <VideoCallModal webRTC={webRTC} />}
+    </div>
+  );
 }
 
 export default App;

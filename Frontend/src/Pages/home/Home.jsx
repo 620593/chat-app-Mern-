@@ -1,5 +1,5 @@
-import MessageContainer from "../../components/messages/MessageContainer";
-import Sidebar from "../../components/sidebar/Sidebar";
+import MessageContainer from "../../components/Messages/MessageContainer";
+import Sidebar from "../../components/Sidebar/SideBar";
 import { motion } from "framer-motion";
 import useConversation from "../../zustand/useConversation";
 
