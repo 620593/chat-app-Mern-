@@ -47,7 +47,12 @@ const useSignup = () => {
       localStorage.setItem("chat-user", JSON.stringify(data));
       setAuthUser(data);
     } catch (error) {
-      toast.error(error.message);
+    const isNetworkError = error instanceof TypeError;
+    toast.error(
+      isNetworkError
+        ? "Cannot reach server. Check VITE_BACKEND_URL and backend CORS ALLOWED_ORIGINS."
+        : error.message
+    );
     } finally {
       setLoading(false);
     }
