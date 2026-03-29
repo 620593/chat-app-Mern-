@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useAuthContext } from "./AuthContext";
 import io from "socket.io-client";
+import { getSocketUrl } from "../utils/api";
 
 const SocketContext = createContext();
 
@@ -45,10 +46,7 @@ export const SocketContextProvider = ({ children }) => {
     // Guard: socket already live for this user — skip re-creation
     if (socketRef.current?.connected) return;
 
-    const socketUrl =
-      import.meta.env.VITE_BACKEND_URL ||
-      import.meta.env.VITE_URL ||
-      "http://localhost:5000";
+    const socketUrl = getSocketUrl();
 
     setConnectionStatus("connecting");
 
